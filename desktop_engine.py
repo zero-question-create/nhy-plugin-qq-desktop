@@ -684,17 +684,19 @@ async def _vision_describe(hwnd: int, name: str = "") -> str:
         return ""
 
 
-async def read_current_chat(hwnd: int, name: str = "", use_vision: bool = True) -> str:
+async def read_current_chat(hwnd: int, name: str = "", use_vision: bool = True,
+                           text: str = "") -> str:
     """读取当前会话消息：结构化 UIA 文本 + 有图片时补视觉描述。"""
-    text = snapshot_text(hwnd)
+    text = str(text or "") or snapshot_text(hwnd)
     self_name = parse_self_name(text)
     messages = extract_messages(hwnd, conversation=name, self_name=self_name)
     lines = format_messages(messages, limit=40)
     has_image = any(m.get("text") == "【图片】" for m in messages)
-    incoming_count = sum(1 for m in messages if m.get("direction") == "other")
 
     vision = ""
-    if use_vision and (has_image or incoming_count < 3):
+    # 以前只要“对方消息少于 3 条”就补视觉，导致每次切会话都可能多花十几秒。
+    # 结构化文本已经读到时不再兜底；只有出现图片、或整棵消息树没解析出内容时才看截图。
+    if use_vision and (has_image or (not messages and not lines)):
         vision = await _vision_describe(hwnd, name)
 
     parts = []
