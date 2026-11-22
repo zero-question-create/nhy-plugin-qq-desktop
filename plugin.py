@@ -111,6 +111,29 @@ class QQDesktopPlugin(Plugin):
         with self._lock:
             return self._current_label
 
+    async def read_current(self) -> dict:
+        """读取当前会话内容，供 ChatAgent/认知层直接使用。"""
+        hwnd = self.window_hwnd()
+        if not hwnd:
+            return {"ok": False, "detail": "QQ 窗口没有打开"}
+        name = self.current_conversation()
+        loop = asyncio.get_running_loop()
+        content = await loop.run_in_executor(
+            None,
+            lambda: asyncio.run(
+                engine.read_current_chat(hwnd, name, use_vision=True)
+            ),
+        )
+        content = str(content or "").strip()
+        if not content:
+            return {"ok": False, "detail": "没有读到当前会话内容"}
+        return {
+            "ok": True,
+            "conversation": name,
+            "content": content,
+            "detail": content[:4000],
+        }
+
     def window_hwnd(self) -> int:
         with self._lock:
             return int(self._hwnd or 0)
